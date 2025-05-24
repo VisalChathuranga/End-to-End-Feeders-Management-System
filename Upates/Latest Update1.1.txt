@@ -1,0 +1,1019 @@
+import tkinter as tk
+from tkinter import ttk
+import customtkinter as ctk
+from tkcalendar import DateEntry
+from tkinter import messagebox
+import pandas as pd
+import openpyxl
+from PIL import Image, ImageTk
+import os
+from datetime import datetime, timedelta
+import json
+import shutil
+
+
+# File paths for storing machine types and serial numbers
+MACHINE_TYPES_FILE = 'machine_types.json'
+SERIAL_NUMBERS_FILE = 'serial_numbers.json'
+
+# Directory where the .xlsx files are located
+DIRECTORY_PATH = 'Z:/Visal'
+
+def save_machine_types():
+    with open(MACHINE_TYPES_FILE, 'w') as file:
+        json.dump(new_machines, file)
+
+def load_machine_types():
+    global new_machines
+    if os.path.exists(MACHINE_TYPES_FILE):
+        with open(MACHINE_TYPES_FILE, 'r') as file:
+            new_machines = json.load(file)
+    else:
+        new_machines = []
+
+def save_serial_numbers():
+    with open(SERIAL_NUMBERS_FILE, 'w') as file:
+        json.dump(serial_numbers, file)
+
+def load_serial_numbers():
+    global serial_numbers
+    if os.path.exists(SERIAL_NUMBERS_FILE):
+        with open(SERIAL_NUMBERS_FILE, 'r') as file:
+            serial_numbers = json.load(file)
+    else:
+        serial_numbers = {}
+
+def refresh_machine_type_combos():
+    machine_types = ["Siplace", "Yamaha"] + new_machines
+    machine_type_combo['values'] = machine_types
+
+def get_file_path(machine_type):
+    if machine_type not in ["Siplace", "Yamaha"] + new_machines:
+        messagebox.showerror("Error", "Please select a valid machine type.")
+        return None
+    return f'Z:/Visal/{machine_type}/{machine_type} Feeder Inventory.xlsx'
+
+def open_repair_window():
+    def submit_repair():
+        machine_type = machine_type_combo.get()
+        file_path = get_file_path(machine_type)
+        if file_path is None:
+            return
+
+        date = date_entry.get()
+        feeder_type = feeder_type_entry.get() + " mm"  # Append " mm" to the feeder type
+        serial_number = feeder_part_no_entry.get()
+        fault = fault_entry.get()
+        part_number = part_number_entry.get()
+        repair_history = repair_history_entry.get()
+
+        # Check if the serial number is valid
+        if machine_type not in serial_numbers or serial_number not in serial_numbers[machine_type]:
+            messagebox.showerror("Error", "Invalid Serial Number.")
+            return
+
+        if not date or not feeder_type or not serial_number or not fault or not repair_history:
+            messagebox.showerror("Error", "Please fill all the required fields.")
+        else:
+            try:
+                wb = openpyxl.load_workbook(file_path)
+                ws = wb['Repair History']
+                next_row = ws.max_row + 1
+                ws.cell(row=next_row, column=1, value=date)
+                ws.cell(row=next_row, column=2, value=feeder_type)
+                ws.cell(row=next_row, column=3, value=serial_number)
+                ws.cell(row=next_row, column=4, value=fault)
+                ws.cell(row=next_row, column=5, value=part_number)
+                ws.cell(row=next_row, column=6, value=repair_history)
+                wb.save(file_path)
+                messagebox.showinfo("Success", "Submitted Successfully")
+                new_window.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update Excel file: {e}")
+
+    new_window = ctk.CTkToplevel(root)
+    new_window.title("REPAIR")
+    new_window.geometry('400x500')
+    new_window.resizable(False, False)
+    new_window.attributes("-topmost", 1)  # Ensure the window is on top
+
+
+    form_frame = ctk.CTkFrame(new_window)
+    form_frame.pack(padx=20, pady=20, fill='both', expand=True)
+
+    form_frame.grid_columnconfigure(1, weight=1)
+    for row in range(6):
+        form_frame.grid_rowconfigure(row, weight=1)
+
+    # Date Entry
+    ctk_label = ctk.CTkLabel(form_frame, text="Date : *")
+    ctk_label.grid(row=0, column=0, padx=10, pady=10, sticky='w')
+    date_entry_frame = ctk.CTkFrame(form_frame)  # Frame to hold the DateEntry
+    date_entry_frame.grid(row=0, column=1, padx=10, pady=10, sticky='ew')
+    date_entry = DateEntry(date_entry_frame, date_pattern='yyyy-mm-dd', background='lightgray', foreground='black', borderwidth=2)
+    date_entry.pack(fill='x')
+
+    # Feeder Type
+    ctk_label = ctk.CTkLabel(form_frame, text="Feeder Type : *")
+    ctk_label.grid(row=1, column=0, padx=10, pady=10, sticky='w')
+    feeder_type_entry = ctk.CTkEntry(form_frame)
+    feeder_type_entry.grid(row=1, column=1, padx=10, pady=10, sticky='ew')
+
+    # Serial Number
+    ctk_label = ctk.CTkLabel(form_frame, text="Serial Number : *")
+    ctk_label.grid(row=2, column=0, padx=10, pady=10, sticky='w')
+    feeder_part_no_entry = ctk.CTkEntry(form_frame)
+    feeder_part_no_entry.grid(row=2, column=1, padx=10, pady=10, sticky='ew')
+
+    # Fault
+    ctk_label = ctk.CTkLabel(form_frame, text="Fault : *")
+    ctk_label.grid(row=3, column=0, padx=10, pady=10, sticky='w')
+    fault_entry = ctk.CTkEntry(form_frame)
+    fault_entry.grid(row=3, column=1, padx=10, pady=10, sticky='ew')
+
+    # Part Number
+    ctk_label = ctk.CTkLabel(form_frame, text="Part Number (If part used) :")
+    ctk_label.grid(row=4, column=0, padx=10, pady=10, sticky='w')
+    part_number_entry = ctk.CTkEntry(form_frame)
+    part_number_entry.grid(row=4, column=1, padx=10, pady=10, sticky='ew')
+
+    # Repair History
+    ctk_label = ctk.CTkLabel(form_frame, text="Repair History : *")
+    ctk_label.grid(row=5, column=0, padx=10, pady=10, sticky='w')
+    repair_history_entry = ctk.CTkEntry(form_frame)
+    repair_history_entry.grid(row=5, column=1, padx=10, pady=10, sticky='ew', ipady=10)
+
+    submit_button = ctk.CTkButton(form_frame, text="Submit", command=submit_repair,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=40)
+    submit_button.grid(row=6, column=0, columnspan=2, pady=20)
+
+def open_maintenance_window():
+    maintenance_window = ctk.CTkToplevel(root)
+    maintenance_window.title("MAINTENANCE")
+    maintenance_window.geometry('800x620')
+    maintenance_window.resizable(False, False)
+    maintenance_window.attributes("-topmost", 1)  # Ensure the window is on top
+
+    # Frame for reminders
+    entry_frame = ctk.CTkFrame(maintenance_window, width=580, height=500)
+    entry_frame.pack(pady=20)
+
+    # Call function to show reminders
+    show_reminders(entry_frame)
+
+    # Frame for buttons
+    button_frame = ctk.CTkFrame(maintenance_window)
+    button_frame.pack(side=tk.BOTTOM, pady=15, padx=30, fill=tk.X)
+
+    # Siplace button
+    siplace_button = ctk.CTkButton(button_frame, text="Siplace", command=lambda: open_siplace_window("Siplace"), fg_color="#1E90FF", hover_color="#104E8B", text_color="white", height=40)
+    siplace_button.pack(side=tk.LEFT)
+
+    # Yamaha button
+    yamaha_button = ctk.CTkButton(button_frame, text="Yamaha", command=lambda: open_yamaha_window("Yamaha"), fg_color="#1E90FF", hover_color="#104E8B", text_color="white", height=40)
+    yamaha_button.pack(side=tk.RIGHT)
+
+def show_reminders(frame):
+    file_path = "Z:/Visal/Annual Maintenance/Annual Maintenance.xlsx"
+    try:
+        wb = openpyxl.load_workbook(file_path)
+        ws = wb.active
+
+        today = datetime.now().date()
+        reminders = []
+
+        # Debugging: Print today's date
+        print(f"Today's date: {today}")
+
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            # Debugging: Print row data
+            print(f"Row data: {row}")
+
+            machine_type = row[0]
+            feeder_type = row[1]
+            serial_number = row[2]
+            last_maintenance_date = row[4]  # Assuming this is a date
+            next_maintenance_date = row[5]  # This might be a string or datetime.datetime
+
+            # Convert next_maintenance_date to a datetime.date object
+            if isinstance(next_maintenance_date, datetime):
+                next_date = next_maintenance_date.date()
+            elif isinstance(next_maintenance_date, str):
+                try:
+                    next_date = datetime.strptime(next_maintenance_date, '%Y-%m-%d').date()
+                except ValueError as ve:
+                    print(f"Date conversion error: {ve} for next_maintenance_date_str: {next_maintenance_date}")
+                    continue
+            else:
+                print(f"Unexpected type for next_maintenance_date: {type(next_maintenance_date)}")
+                continue
+
+            remaining_days = (next_date - today).days
+            
+            # Debugging: Print remaining days
+            print(f"Machine: {machine_type}, Remaining days: {remaining_days}")
+
+            if 335 >= remaining_days >= 0:
+                reminders.append((machine_type, serial_number, next_date, remaining_days))
+
+        # Sort reminders by remaining days in ascending order
+        reminders.sort(key=lambda x: x[3])
+
+        # Clear existing widgets
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        # Create a frame for the table
+        table_frame = ctk.CTkFrame(frame)
+        table_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Create headers
+        headers = ["Machine", "Serial Number", "Next Maintenance Date", "Days Remaining", "Reminder Date"]
+        column_widths = [15, 20, 20, 15, 20]
+
+        # Create header labels and column separators
+        for idx, (header, width) in enumerate(zip(headers, column_widths)):
+            label = ctk.CTkLabel(table_frame, text=header, font=("Arial Black", 14, "bold"), anchor="center", width=width*10)
+            label.grid(row=0, column=idx, padx=5, pady=5, sticky="ew")
+
+        # Display reminders in the table format
+        if reminders:
+            for row_idx, (machine_type, serial_number, next_date, remaining_days) in enumerate(reminders, start=1):
+                # Create labels for each cell
+                ctk.CTkLabel(table_frame, text=machine_type, font=("Arial", 12), anchor="center").grid(row=row_idx, column=0, padx=5, pady=5, sticky="ew")
+                ctk.CTkLabel(table_frame, text=serial_number, font=("Arial", 12), anchor="center").grid(row=row_idx, column=1, padx=5, pady=5, sticky="ew")
+                ctk.CTkLabel(table_frame, text=next_date.strftime('%Y-%m-%d'), font=("Arial", 12), anchor="center").grid(row=row_idx, column=2, padx=5, pady=5, sticky="ew")
+                ctk.CTkLabel(table_frame, text=str(remaining_days), font=("Arial", 12), anchor="center").grid(row=row_idx, column=3, padx=5, pady=5, sticky="ew")
+                # Add Reminder Date column
+                ctk.CTkLabel(table_frame, text=next_date.strftime('%Y-%m-%d'), font=("Arial", 12), anchor="center").grid(row=row_idx, column=4, padx=5, pady=5, sticky="ew")
+
+        else:
+            # Ensure to clear any previous messages
+            no_reminder_label = ctk.CTkLabel(frame, text="No upcoming maintenance reminders.",
+                                            font=("Arial Black", 16, "bold"))  # Adjust font size and weight
+            no_reminder_label.pack(padx=10, pady=10)
+
+    except Exception as e:
+        print(f"Error loading or processing Excel file: {e}")
+
+
+class SiplaceMaintenanceWindow:
+    def __init__(self, root, machine_type):
+        self.machine_type = machine_type
+        self.check_vars = []
+
+        self.siplace_window = ctk.CTkToplevel(root)
+        self.siplace_window.title("Siplace Annual Maintenance")
+        self.siplace_window.geometry('525x800')
+        self.siplace_window.resizable(True, True)  # Allow resizing
+        self.siplace_window.attributes("-topmost", 1)
+
+        # Create a canvas and scrollbar
+        self.canvas = tk.Canvas(self.siplace_window)
+        self.scrollbar = tk.Scrollbar(self.siplace_window, orient="vertical", command=self.canvas.yview)
+
+        # Create a frame inside the canvas to contain all the widgets
+        self.frame = ctk.CTkFrame(self.canvas)
+
+        # Create a window in the canvas to hold the frame
+        self.canvas.create_window((0, 0), window=self.frame, anchor="nw")
+
+        # Configure scrollbar
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Pack scrollbar and canvas
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        # Set frame width to be the same as canvas width
+        self.frame.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+        # Bind mouse wheel event to scroll the canvas
+        self.canvas.bind_all("<MouseWheel>", self.on_mousewheel)
+
+        # Create the widgets
+        self.create_widgets()
+
+    def on_mousewheel(self, event):
+        """Handle mouse wheel scrolling."""
+        if event.state == 0x0001:  # Check if Control key is held
+            # On Windows, the event.delta is typically -120 or 120 for up/down
+            delta = event.delta
+        else:
+            # On macOS, the event.delta is a bit different
+            delta = event.delta * -1
+
+        self.canvas.yview_scroll(int(-delta / 120), "units")
+
+    def create_widgets(self):
+        # Date Entry
+        ctk_label = ctk.CTkLabel(self.frame, text="Date : *")
+        ctk_label.grid(row=0, column=0, padx=10, pady=10, sticky='w')
+        date_entry_frame = ctk.CTkFrame(self.frame)  # Frame to hold the DateEntry
+        date_entry_frame.grid(row=0, column=1, padx=10, pady=10, sticky='ew')
+        self.date_entry = DateEntry(date_entry_frame, date_pattern='yyyy-mm-dd', background='lightgray', foreground='black', borderwidth=2)
+        self.date_entry.pack(fill='x')
+
+        # Feeder Type
+        ctk_label = ctk.CTkLabel(self.frame, text="Feeder Type : *")
+        ctk_label.grid(row=1, column=0, padx=10, pady=10, sticky='w')
+        self.feeder_type_entry = ctk.CTkEntry(self.frame)
+        self.feeder_type_entry.grid(row=1, column=1, padx=10, pady=10, sticky='ew')
+
+        # Serial Number
+        ctk_label = ctk.CTkLabel(self.frame, text="Serial Number : *")
+        ctk_label.grid(row=2, column=0, padx=10, pady=10, sticky='w')
+        self.serial_entry = ctk.CTkEntry(self.frame)
+        self.serial_entry.grid(row=2, column=1, padx=10, pady=10, sticky='ew')
+
+        # Paths to images
+        image_paths = [
+            "Z:/Visal/Annual Maintenance/Siplace Images/1.Cleaning the Pickup Area.png",
+            "Z:/Visal/Annual Maintenance/Siplace Images/2.Checking the Centering Pin, EDIF and Roller.png",
+            "Z:/Visal/Annual Maintenance/Siplace Images/3.Checking the Cover Tape.png",
+            "Z:/Visal/Annual Maintenance/Siplace Images/4.Checking the Foil Draw-In.png",
+            "Z:/Visal/Annual Maintenance/Siplace Images/5.Checking the Slide Bearings.png",
+            "Z:/Visal/Annual Maintenance/Siplace Images/6.Cleaning the Side Covers.png"
+        ]
+
+        instructions = [
+            "1. Cleaning the Pickup Area",
+            "2. Checking the Centering Pin, EDIF, and Roller",
+            "3. Checking the Cover Tape",
+            "4. Checking the Foil Draw-In",
+            "5. Checking the Slide Bearings",
+            "6. Cleaning the Side Covers"
+        ]
+
+        image_start_row = 4
+        for i, (path, instruction) in enumerate(zip(image_paths, instructions)):
+            var = tk.IntVar()
+            self.check_vars.append(var)
+
+            try:
+                # Load image
+                image = Image.open(path)
+                image = image.resize((400, 300))  # Resize if needed
+                photo = ImageTk.PhotoImage(image)
+
+                # Display image
+                img_label = ctk.CTkLabel(self.frame, text="", image=photo)
+                img_label.image = photo  # Keep a reference to avoid garbage collection
+                img_label.grid(row=image_start_row + i * 2, column=0, columnspan=2, padx=10, pady=10)
+
+                # Instruction label
+                instr_label = ctk.CTkLabel(self.frame, text=instruction)
+                instr_label.grid(row=image_start_row + i * 2 + 1, column=0, padx=10, pady=10)
+
+                # Checkbox
+                ctk.CTkCheckBox(self.frame, text="Finish", variable=var, command=self.check_all_ticked).grid(row=image_start_row + i * 2 + 1, column=1, padx=10, pady=10)
+
+            except Exception as e:
+                print(f"Error loading image {path}: {e}")
+
+        # Place the "Remarks" entry label after all images and instructions
+        remarks_row = image_start_row + len(image_paths) * 2
+        ctk.CTkLabel(self.frame, text="Remarks:").grid(row=remarks_row, column=0, padx=10, pady=10)
+        self.remarks_entry = ctk.CTkEntry(self.frame, width=200)
+        self.remarks_entry.grid(row=remarks_row, column=1, padx=10, pady=10)
+
+        # Place the "Submit" button below the "Remarks" entry
+        submit_button = ctk.CTkButton(self.frame, text="Submit", command=self.submit_maintenance, fg_color="#1E90FF", hover_color="#104E8B", text_color="white", height=40)
+        submit_button.grid(row=remarks_row + 1, column=1, padx=10, pady=10)
+
+        # Update canvas scroll region to encompass all widgets
+        self.frame.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+    def check_all_ticked(self):
+        if all(var.get() for var in self.check_vars):
+            self.remarks_entry.delete(0, tk.END)
+            self.remarks_entry.insert(0, "OK")
+
+    def submit_maintenance(self):
+        date = self.date_entry.get()
+        feeder_type = self.feeder_type_entry.get() + " mm" if not self.feeder_type_entry.get().endswith(" mm") else self.feeder_type_entry.get()
+        serial_number = self.serial_entry.get()
+        remarks = self.remarks_entry.get()
+
+        file_path = "Z:/Visal/Annual Maintenance/Annual Maintenance.xlsx"
+
+        # Check if the serial number is valid
+        if self.machine_type not in serial_numbers or serial_number not in serial_numbers[self.machine_type]:
+            messagebox.showerror("Error", "Invalid Serial Number.")
+            return
+        
+        if not date or not feeder_type or not serial_number:
+            messagebox.showerror("Error", "Please fill all the required fields.")
+            return
+
+        # Validate date format
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d")  # Adjust the format to match your date entry format
+        except ValueError:
+            messagebox.showerror("Error", "Invalid date format. Please use YYYY-MM-DD.")
+            return
+        
+        try:
+            wb = openpyxl.load_workbook(file_path)
+            ws = wb.active
+
+            # Variable to keep track of whether a row was updated
+            row_to_update = None
+
+            # Find the row with the same serial number
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=3, max_col=3):
+                if row[0].value == serial_number:
+                    row_to_update = row[0].row
+                    break
+
+            if row_to_update:
+                # Update the existing row
+                ws.cell(row=row_to_update, column=1, value=self.machine_type)
+                ws.cell(row=row_to_update, column=2, value=feeder_type)
+                ws.cell(row=row_to_update, column=4, value=remarks if remarks else ("OK" if all(var.get() for var in self.check_vars) else ""))
+                ws.cell(row=row_to_update, column=5, value=date_obj.strftime("%Y-%m-%d"))
+                ws.cell(row=row_to_update, column=6, value=(date_obj + timedelta(days=365)).strftime("%Y-%m-%d"))
+            else:
+                # Add a new row
+                next_row = ws.max_row + 1
+                ws.cell(row=next_row, column=1, value=self.machine_type)
+                ws.cell(row=next_row, column=2, value=feeder_type)
+                ws.cell(row=next_row, column=3, value=serial_number)
+                ws.cell(row=next_row, column=4, value=remarks if remarks else ("OK" if all(var.get() for var in self.check_vars) else ""))
+                ws.cell(row=next_row, column=5, value=date_obj.strftime("%Y-%m-%d"))
+                ws.cell(row=next_row, column=6, value=(date_obj + timedelta(days=365)).strftime("%Y-%m-%d"))
+
+            # Save the workbook
+            wb.save(file_path)
+            messagebox.showinfo("Success", "Submitted Successfully")
+
+            # Clear all labels and checkboxes
+            self.clear_widgets()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update Excel file: {e}")
+
+    def clear_widgets(self):
+    # Clear text entries
+        self.date_entry.delete(0, tk.END)
+        self.feeder_type_entry.delete(0, tk.END)
+        self.serial_entry.delete(0, tk.END)
+        self.remarks_entry.delete(0, tk.END)
+
+        # Clear checkboxes
+        for var in self.check_vars:
+            var.set(False)
+
+
+def open_siplace_window(machine_type):
+    SiplaceMaintenanceWindow(root, machine_type)
+
+class YamahaMaintenanceWindow:
+    def __init__(self, root, machine_type):
+        self.machine_type = machine_type
+        self.check_vars = []
+
+        self.yamaha_window = ctk.CTkToplevel(root)
+        self.yamaha_window.title("Yamaha Annual Maintenance")
+        self.yamaha_window.geometry('600x800')
+        self.yamaha_window.resizable(True, True)  # Allow resizing
+        self.yamaha_window.attributes("-topmost", 1)
+
+        # Create a canvas and scrollbar
+        self.canvas = tk.Canvas(self.yamaha_window)
+        self.scrollbar = tk.Scrollbar(self.yamaha_window, orient="vertical", command=self.canvas.yview)
+
+        # Create a frame inside the canvas to contain all the widgets
+        self.frame = ctk.CTkFrame(self.canvas)
+
+        # Create a window in the canvas to hold the frame
+        self.canvas.create_window((0, 0), window=self.frame, anchor="nw")
+
+        # Configure scrollbar
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Pack scrollbar and canvas
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        # Set frame width to be the same as canvas width
+        self.frame.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+        # Bind mouse wheel event to scroll the canvas
+        self.canvas.bind_all("<MouseWheel>", self.on_mousewheel)
+
+        # Create the widgets
+        self.create_widgets()
+
+    def on_mousewheel(self, event):
+        """Handle mouse wheel scrolling."""
+        if event.state == 0x0001:  # Check if Control key is held
+            # On Windows, the event.delta is typically -120 or 120 for up/down
+            delta = event.delta
+        else:
+            # On macOS, the event.delta is a bit different
+            delta = event.delta * -1
+
+        self.canvas.yview_scroll(int(-delta / 120), "units")
+
+
+    def create_widgets(self):
+        # Date Entry
+        ctk_label = ctk.CTkLabel(self.frame, text="Date : *")
+        ctk_label.grid(row=0, column=0, padx=10, pady=10, sticky='w')
+        date_entry_frame = ctk.CTkFrame(self.frame)  # Frame to hold the DateEntry
+        date_entry_frame.grid(row=0, column=1, padx=10, pady=10, sticky='ew')
+        self.date_entry = DateEntry(date_entry_frame, date_pattern='yyyy-mm-dd', background='lightgray', foreground='black', borderwidth=2)
+        self.date_entry.pack(fill='x')
+
+        # Feeder Type
+        ctk_label = ctk.CTkLabel(self.frame, text="Feeder Type : *")
+        ctk_label.grid(row=1, column=0, padx=10, pady=10, sticky='w')
+        self.feeder_type_entry = ctk.CTkEntry(self.frame)
+        self.feeder_type_entry.grid(row=1, column=1, padx=10, pady=10, sticky='ew')
+
+        # Serial Number
+        ctk_label = ctk.CTkLabel(self.frame, text="Serial Number : *")
+        ctk_label.grid(row=2, column=0, padx=10, pady=10, sticky='w')
+        self.serial_entry = ctk.CTkEntry(self.frame)
+        self.serial_entry.grid(row=2, column=1, padx=10, pady=10, sticky='ew')
+
+        # Paths to images
+        image_paths = [
+            "Z:/Visal/Annual Maintenance/yamaha Images/1.Check the tape guide assembly and tape guide front lever.png",
+            "Z:/Visal/Annual Maintenance/yamaha Images/2.Check front block.png",
+            "Z:/Visal/Annual Maintenance/yamaha Images/3.Check Board connector.png",
+            "Z:/Visal/Annual Maintenance/yamaha Images/4.Check Under Rail.png"
+        ]
+
+        instructions = [
+            "1. Check the tape guide assembly and tape guide front lever",
+            "2. Check front block",
+            "3. Check Board connector",
+            "4. Check Under Rail"            
+        ]
+
+        image_start_row = 4
+        for i, (path, instruction) in enumerate(zip(image_paths, instructions)):
+            var = tk.IntVar()
+            self.check_vars.append(var)
+
+            try:
+                # Load image
+                image = Image.open(path)
+                image = image.resize((400, 300))  # Resize if needed
+                photo = ImageTk.PhotoImage(image)
+
+                # Display image
+                img_label = ctk.CTkLabel(self.frame, text="", image=photo)
+                img_label.image = photo  # Keep a reference to avoid garbage collection
+                img_label.grid(row=image_start_row + i * 2, column=0, columnspan=2, padx=10, pady=10)
+
+                # Instruction label
+                instr_label = ctk.CTkLabel(self.frame, text=instruction)
+                instr_label.grid(row=image_start_row + i * 2 + 1, column=0, padx=10, pady=10)
+
+                # Checkbox
+                ctk.CTkCheckBox(self.frame, text="Finish", variable=var, command=self.check_all_ticked).grid(row=image_start_row + i * 2 + 1, column=1, padx=10, pady=10)
+
+            except Exception as e:
+                print(f"Error loading image {path}: {e}")
+
+        # Place the "Remarks" entry label after all images and instructions
+        remarks_row = image_start_row + len(image_paths) * 2
+        ctk.CTkLabel(self.frame, text="Remarks:").grid(row=remarks_row, column=0, padx=10, pady=10)
+        self.remarks_entry = ctk.CTkEntry(self.frame, width=200)
+        self.remarks_entry.grid(row=remarks_row, column=1, padx=10, pady=10)
+
+        # Place the "Submit" button below the "Remarks" entry
+        submit_button = ctk.CTkButton(self.frame, text="Submit", command=self.submit_maintenance, fg_color="#1E90FF", hover_color="#104E8B", text_color="white", height=40)
+        submit_button.grid(row=remarks_row + 1, column=1, padx=10, pady=10)
+
+        # Update canvas scroll region to encompass all widgets
+        self.frame.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+    def check_all_ticked(self):
+        if all(var.get() for var in self.check_vars):
+            self.remarks_entry.delete(0, tk.END)
+            self.remarks_entry.insert(0, "OK")
+
+    def submit_maintenance(self):
+        date = self.date_entry.get()
+        feeder_type = self.feeder_type_entry.get() + " mm" if not self.feeder_type_entry.get().endswith(" mm") else self.feeder_type_entry.get()
+        serial_number = self.serial_entry.get()
+        remarks = self.remarks_entry.get()
+
+        file_path = "Z:/Visal/Annual Maintenance/Annual Maintenance.xlsx"
+
+        # Check if the serial number is valid
+        if self.machine_type not in serial_numbers or serial_number not in serial_numbers[self.machine_type]:
+            messagebox.showerror("Error", "Invalid Serial Number.")
+            return
+
+        if not date or not feeder_type or not serial_number:
+            messagebox.showerror("Error", "Please fill all the required fields.")
+            return
+
+        # Validate date format
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d")  # Adjust the format to match your date entry format
+        except ValueError:
+            messagebox.showerror("Error", "Invalid date format. Please use YYYY-MM-DD.")
+            return
+        
+        try:
+            wb = openpyxl.load_workbook(file_path)
+            ws = wb.active
+            row_to_update = None
+
+            # Find the row with the same serial number
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=3, max_col=3):
+                if row[0].value == serial_number:
+                    row_to_update = row[0].row
+                    break
+
+            if row_to_update:
+                # Update the existing row
+                ws.cell(row=row_to_update, column=1, value=self.machine_type)
+                ws.cell(row=row_to_update, column=2, value=feeder_type)
+                ws.cell(row=row_to_update, column=3, value=serial_number)
+                ws.cell(row=row_to_update, column=4, value=remarks if remarks else ("OK" if all(var.get() for var in self.check_vars) else ""))
+                ws.cell(row=row_to_update, column=5, value=date_obj.strftime("%Y-%m-%d"))
+                ws.cell(row=row_to_update, column=6, value=(date_obj + timedelta(days=365)).strftime("%Y-%m-%d"))
+            else:
+                # Add a new row if no existing row was found
+                next_row = ws.max_row + 1
+                ws.cell(row=next_row, column=1, value=self.machine_type)
+                ws.cell(row=next_row, column=2, value=feeder_type)
+                ws.cell(row=next_row, column=3, value=serial_number)
+                ws.cell(row=next_row, column=4, value=remarks if remarks else ("OK" if all(var.get() for var in self.check_vars) else ""))
+                ws.cell(row=next_row, column=5, value=date_obj.strftime("%Y-%m-%d"))
+                ws.cell(row=next_row, column=6, value=(date_obj + timedelta(days=365)).strftime("%Y-%m-%d"))
+
+            # Save the workbook
+            wb.save(file_path)
+            messagebox.showinfo("Success", "Submitted Successfully")
+
+            # Clear all labels and checkboxes
+            self.clear_widgets()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update Excel file: {e}")
+
+    def clear_widgets(self):
+    # Clear text entries
+        self.date_entry.delete(0, tk.END)
+        self.feeder_type_entry.delete(0, tk.END)
+        self.serial_entry.delete(0, tk.END)
+        self.remarks_entry.delete(0, tk.END)
+
+        # Clear checkboxes
+        for var in self.check_vars:
+            var.set(False)
+            
+def open_yamaha_window(machine_type):
+    YamahaMaintenanceWindow(root, machine_type)
+
+def open_admin_dashboard():
+    def show_history():
+        machine_type = machine_type_combo_admin.get()
+        serial_number = serial_number_entry_admin.get()
+
+        file_path = get_file_path(machine_type)
+        if file_path is None:
+            return
+        
+        try:
+            wb = openpyxl.load_workbook(file_path)
+            ws = wb['Repair History']
+
+            found_records = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if row[2] == serial_number:
+                    found_records.append(row)
+
+            if found_records:
+                history_window = tk.Toplevel(admin_dashboard)
+                history_window.title("Repair History")
+
+                # Create a frame for the table
+                table_frame = ctk.CTkFrame(history_window)
+                table_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+                # Create headers
+                headers = ["Date", "Feeder Type", "Serial Number", "Fault", "Part Number", "Repair History"]
+                column_widths = [15, 20, 20, 20, 20, 30]
+
+                for idx, (header, width) in enumerate(zip(headers, column_widths)):
+                    label = ctk.CTkLabel(table_frame, text=header, font=("Arial Black", 14, "bold"), anchor="center", width=width*10)
+                    label.grid(row=0, column=idx, padx=5, pady=5, sticky="ew")
+
+                # Display records in the table format
+                for row_idx, record in enumerate(found_records, start=1):
+                    for col_idx, value in enumerate(record):
+                        ctk.CTkLabel(table_frame, text=value, font=("Arial", 12), anchor="center").grid(row=row_idx, column=col_idx, padx=5, pady=5, sticky="ew")
+            
+            else:
+                messagebox.showinfo("No History", "No repair history found for this serial number.")
+        
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load history: {e}")
+
+
+    def add_machine():
+        def submit_new_machine():
+            machine_name = new_machine_entry.get()
+            if not machine_name:
+                messagebox.showerror("Error", "Please enter a machine name.")
+                return
+
+            folder_path = os.path.join("Z:/Visal", machine_name)
+            file_path = os.path.join(folder_path, f"{machine_name} Feeder Inventory.xlsx")
+
+            try:
+                os.makedirs(folder_path, exist_ok=True)
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = 'Repair History'
+                headers = ["Date", "Feeder Type", "Serial Number", "Fault", "Part Number", "Repair History"]
+                ws.append(headers)
+                wb.save(file_path)
+
+                if machine_name not in new_machines:
+                    new_machines.append(machine_name)
+                    save_machine_types()  # Save the updated list to file
+                    refresh_machine_type_combos()  # Update both combo boxes
+                else:
+                    messagebox.showinfo("Info", "Machine already exists.")
+                
+                messagebox.showinfo("Success", "New machine added successfully.")
+                add_machine_window.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to create machine: {e}")
+
+        # Create a new top-level window using customtkinter
+        add_machine_window = ctk.CTkToplevel(admin_dashboard)
+        add_machine_window.title("Add New Machine")
+        add_machine_window.geometry('300x200')
+        add_machine_window.attributes("-topmost", 1)  # Ensure the window is on top
+
+        # Create and style the frame using customtkinter
+        frame = ctk.CTkFrame(add_machine_window, fg_color="#d3d3d3")
+        frame.pack(padx=15, pady=15, fill='both', expand=True)
+
+        # Create and style the label using customtkinter
+        ctk_label = ctk.CTkLabel(frame, text="Machine Name:", font=("Helvetica", 14))
+        ctk_label.pack(pady=5)
+
+        # Create and style the entry widget using customtkinter
+        new_machine_entry = ctk.CTkEntry(frame, width=200)
+        new_machine_entry.pack(pady=5)
+
+        submit_button = ctk.CTkButton(frame, text="Submit", command=submit_new_machine,fg_color="#1E90FF",hover_color="#104E8B", text_color="white")
+        submit_button.pack(pady=30)
+
+    def remove_machine():
+        def submit_remove_machine():
+            machine_name = machine_type_combo_remove.get()
+            if not machine_name:
+                messagebox.showerror("Error", "Please select a machine.")
+                return
+
+            folder_path = os.path.join("Z:/Visal", machine_name)
+
+            try:
+                shutil.rmtree(folder_path)  # Remove the folder and its contents
+
+                if machine_name in new_machines:
+                    new_machines.remove(machine_name)
+                    save_machine_types()  # Save the updated list to file
+                    refresh_machine_type_combos()  # Update both combo boxes
+                    messagebox.showinfo("Success", "Machine removed successfully.")
+                else:
+                    messagebox.showinfo("Info", "Machine not found in the list.")
+
+                remove_machine_window.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to remove machine: {e}")
+
+        # Create a new top-level window using customtkinter
+        remove_machine_window = ctk.CTkToplevel(admin_dashboard)
+        remove_machine_window.title("Remove Machine")
+        remove_machine_window.geometry('300x200')
+        remove_machine_window.attributes("-topmost", 1)  # Ensure the window is on top
+
+        # Create and style the frame using customtkinter
+        frame = ctk.CTkFrame(remove_machine_window, fg_color="#d3d3d3")
+        frame.pack(padx=15, pady=15, fill='both', expand=True)
+
+        # Create and style the label using customtkinter
+        ctk_label = ctk.CTkLabel(frame, text="Select Machine:", font=("Helvetica", 14))
+        ctk_label.pack(pady=5)
+
+        # Create and style the combo box using customtkinter
+        machine_type_combo_remove = ctk.CTkComboBox(frame, values=["Siplace", "Yamaha"] + new_machines, width=200)
+        machine_type_combo_remove.pack(pady=5)
+
+        # Create and style the remove button using customtkinter
+        remove_button = ctk.CTkButton(frame, text="Remove", command=submit_remove_machine, fg_color="#1E90FF", hover_color="#104E8B", text_color="white")
+        remove_button.pack(pady=30)
+
+    def open_add_remove_feeder_window():
+        def add_feeder():
+            machine_type = machine_type_combo_add_remove.get()
+            serial_number = serial_number_entry_add_remove.get()
+
+            if not machine_type or not serial_number:
+                messagebox.showerror("Error", "Please fill all the required fields.")
+                return
+
+            # Check if the machine type exists in serial_numbers
+            if machine_type not in serial_numbers:
+                serial_numbers[machine_type] = []
+
+            # Check if the serial number already exists
+            if serial_number in serial_numbers[machine_type]:
+                messagebox.showerror("Error", "Serial number already exists.")
+            else:
+                # Add the serial number to the list and save it
+                serial_numbers[machine_type].append(serial_number)
+                save_serial_numbers()
+                messagebox.showinfo("Success", "Feeder added successfully.")
+                add_remove_feeder_window.destroy()
+
+        def remove_feeder():
+            machine_type = machine_type_combo_add_remove.get()
+            serial_number = serial_number_entry_add_remove.get()
+
+            if not machine_type or not serial_number:
+                messagebox.showerror("Error", "Please fill all the required fields.")
+                return
+
+            # Check if the machine type exists and the serial number is present
+            if machine_type in serial_numbers and serial_number in serial_numbers[machine_type]:
+                # Remove the serial number from the list
+                serial_numbers[machine_type].remove(serial_number)
+                if not serial_numbers[machine_type]:  # Remove the machine type if no serial numbers left
+                    del serial_numbers[machine_type]
+                save_serial_numbers()
+                messagebox.showinfo("Success", "Feeder removed successfully.")
+                add_remove_feeder_window.destroy()
+            else:
+                messagebox.showerror("Error", "Serial number does not exist.")
+
+        # Create a new top-level window using customtkinter
+        add_remove_feeder_window = ctk.CTkToplevel(admin_dashboard)
+        add_remove_feeder_window.title("Add/Remove Feeder")
+        add_remove_feeder_window.geometry('400x220')
+        add_remove_feeder_window.attributes("-topmost", 1)  # Ensure the window is on top
+
+        # Create and style the form frame using customtkinter
+        form_frame = ctk.CTkFrame(add_remove_feeder_window)
+        form_frame.pack(padx=20, pady=20, fill='both', expand=True)
+
+        # Configure grid columns
+        form_frame.grid_columnconfigure(1, weight=1)
+
+        # Select Machine Type
+        ctk_label_machine_type = ctk.CTkLabel(form_frame, text="Select Machine Type:", font=("Helvetica", 14))
+        ctk_label_machine_type.grid(row=0, column=0, padx=10, pady=10, sticky=tk.W)
+        machine_type_combo_add_remove = ctk.CTkComboBox(form_frame, values=["Siplace", "Yamaha"] + new_machines, width=200)
+        machine_type_combo_add_remove.grid(row=0, column=1, padx=10, pady=10, sticky=tk.EW)        
+
+        # Serial Number
+        ctk_label_serial_number = ctk.CTkLabel(form_frame, text="Serial Number:", font=("Helvetica", 14))
+        ctk_label_serial_number.grid(row=1, column=0, padx=10, pady=10, sticky=tk.W)
+        serial_number_entry_add_remove = ctk.CTkEntry(form_frame, width=30)
+        serial_number_entry_add_remove.grid(row=1, column=1, padx=10, pady=5, sticky=tk.EW)
+
+        # Add/Remove buttons
+        add_button = ctk.CTkButton(form_frame, text="Add", command=add_feeder, fg_color="#1E90FF", hover_color="#104E8B", text_color="white")
+        add_button.grid(row=2, column=0, padx=10, pady=40, sticky=tk.EW)
+
+        remove_button = ctk.CTkButton(form_frame, text="Remove", command=remove_feeder, fg_color="#1E90FF", hover_color="#104E8B", text_color="white")
+        remove_button.grid(row=2, column=1, padx=10, pady=10, sticky=tk.EW)
+
+    global machine_type_combo_admin
+    # Create a new top-level window using customtkinter
+    admin_dashboard = ctk.CTkToplevel(root)
+    admin_dashboard.title("Admin Dashboard")
+    admin_dashboard.geometry('400x550')
+    admin_dashboard.attributes("-topmost", 1)  # Ensure the window is on top
+
+    # Create and style the frame using customtkinter
+    frame = ctk.CTkFrame(admin_dashboard)
+    frame.pack(padx=20, pady=20, fill='both', expand=True)
+
+    # Select Machine Type
+    ctk_label_machine_type = ctk.CTkLabel(frame, text="Select Machine Type:", font=("Helvetica", 14))
+    ctk_label_machine_type.pack(pady=5)
+    machine_type_combo_admin = ctk.CTkComboBox(frame, values=["Siplace", "Yamaha"] + new_machines, width=200)
+    machine_type_combo_admin.pack(pady=5)
+
+    # Serial Number
+    ctk_label_serial_number = ctk.CTkLabel(frame, text="Serial Number:", font=("Helvetica", 14))
+    ctk_label_serial_number.pack(pady=5)
+    serial_number_entry_admin = ctk.CTkEntry(frame, width=200)
+    serial_number_entry_admin.pack(pady=5)
+
+    show_history_button = ctk.CTkButton(frame, text="Show History", command=show_history,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=40)
+    show_history_button.pack(pady=20)
+
+    add_remove_feeder_button = ctk.CTkButton(frame, text="Add/Remove Feeder", command=open_add_remove_feeder_window,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=40)
+    add_remove_feeder_button.pack(pady=20)
+
+    add_machine_button = ctk.CTkButton(frame, text="Add Machine", command=add_machine,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=40)
+    add_machine_button.pack(pady=20)
+
+    remove_machine_button = ctk.CTkButton(frame, text="Remove Machine", command=remove_machine,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=40)
+    remove_machine_button.pack(pady=20)
+
+def submit_admin():
+    username = username_entry.get()
+    password = password_entry.get()
+    if username == "admin" and password == "password":  # Replace with your logic
+        messagebox.showinfo("Login Success", "Welcome Admin!")
+        open_admin_dashboard()
+    else:
+        messagebox.showerror("Login Failed", "Invalid username or password.")
+
+new_machines = []
+serial_numbers = {}
+
+# Initialize the application
+load_machine_types()
+load_serial_numbers()
+
+root = ctk.CTk()
+root.title("Feeders")
+root.geometry('400x300')
+root.resizable(False, False)
+root.iconbitmap('D:/Feeders GUI/OIP.ico')
+
+# Create a style object
+style = ttk.Style()
+style.configure("TNotebook.Tab", padding=[78, 5])  # Increase padding to make tabs wider
+
+# Create a Notebook widget
+notebook = ttk.Notebook(root)
+notebook.pack(expand=True, fill='both')
+
+# Create tabs
+user_tab = ttk.Frame(notebook)
+notebook.add(user_tab, text='USER')
+
+admin_tab = ttk.Frame(notebook)
+notebook.add(admin_tab, text='ADMIN')
+
+# USER Tab
+user_frame = ctk.CTkFrame(user_tab, fg_color="#d3d3d3")  # Gray color frame
+user_frame.pack(padx=10, pady=10, fill='both', expand=True)
+
+user_label = ctk.CTkLabel(user_frame, text="USER", font=("Helvetica", 14))
+user_label.pack(pady=5)
+
+combo = ttk.Combobox(user_frame, values=["Person 1", "Person 2"], width=30)
+combo.pack(pady=10)
+
+machine_type_label = ctk.CTkLabel(user_frame, text="Machines Type", font=("Helvetica", 14))
+machine_type_label.pack(pady=5)
+
+global machine_type_combo
+machine_type_combo = ttk.Combobox(user_frame, width=30)
+machine_type_combo.pack(pady=10)
+
+refresh_machine_type_combos()  # Initialize combo boxes with saved machine types
+
+button_frame = tk.Frame(user_frame, bg="#d3d3d3")
+button_frame.pack(pady=(20, 20))
+
+repair_button = ctk.CTkButton(button_frame, text="Repair", command=open_repair_window,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=45)
+repair_button.pack(side=tk.LEFT, padx=20)
+
+maintenance_button = ctk.CTkButton(button_frame, text="Maintenance", command=open_maintenance_window,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=45)
+maintenance_button.pack(side=tk.LEFT, padx=20)
+
+# ADMIN Tab
+admin_frame = ctk.CTkFrame(admin_tab, fg_color="#d3d3d3")  # Gray color frame
+admin_frame.pack(padx=10, pady=10, fill='both', expand=True)
+
+admin_label = ctk.CTkLabel(admin_frame, text="Admin Login", font=("Helvetica", 22))
+admin_label.pack()
+
+username_label = ctk.CTkLabel(admin_frame, text="Username", font=("Helvetica", 14))
+username_label.pack(pady=1)
+username_entry = ctk.CTkEntry(admin_frame, width=200)
+username_entry.pack(pady=1)
+
+password_label = ctk.CTkLabel(admin_frame, text="Password", font=("Helvetica", 14))
+password_label.pack(pady=1)
+password_entry = ctk.CTkEntry(admin_frame, show="*", width=200)
+password_entry.pack(pady=1)
+
+submit_button = ctk.CTkButton(admin_frame, text="Submit", command=submit_admin,fg_color="#1E90FF",hover_color="#104E8B", text_color="white",height=45)
+submit_button.pack(pady=28)
+
+root.mainloop()
