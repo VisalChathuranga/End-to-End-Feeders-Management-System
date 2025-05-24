@@ -14,3 +14,30 @@ The Feeders Management System is a Python-based desktop application designed to 
 - Automated maintenance reminders
 - Serial number validation
 - Excel and JSON data integration
+
+## Screenshots
+Below are screenshots of the Feeders Management System interface:
+
+### Main Window
+![Main Window](Feeders%20SS/Main%20window.png)
+
+### Admin Login Window
+![Admin Login Window](Feeders%20SS/admin%20login%20window.png)
+
+### Admin Panel Window
+![Admin Panel Window](Feeders%20SS/admin%20panel%20window.png)
+
+### Repair Window
+![Repair Window](Feeders%20SS/Repair%20window.png)
+
+### Maintenance Window
+![Maintenance Window](Feeders%20SS/Maintenance%20window.png)
+
+### Siplace Maintenance Instructions
+![Siplace Maintenance](Feeders%20SS/Maintenance(siplace)0.png)
+![Cleaning the Pickup Area](Images/Siplace%20Images/1.Cleaning%20the%20Pickup%20Area.png)
+![Checking the Centering Pin](Images/Siplace%20Images/2.Checking%20the%20Centering%20Pin,%20EDIF%20and%20Roller.png)
+
+### Yamaha Maintenance Instructions
+![Yamaha Maintenance](Feeders%20SS/Maintenance(yamaha)0.png)
+![Check Tape Guide Assembly](Images/Yamaha%20Images/1.Check%20the%20tape%20guide%20assembly%20and%20tape%20guide%20front%20lever.png)
